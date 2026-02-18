@@ -1,7 +1,7 @@
 {
   "name": "tree-sitter-wpl",
   "version": "0.1.0",
-  "description": "Tree-sitter grammar for WPL (WarpFusion Parsing Language)",
+  "description": "Tree-sitter grammar for WPL (WarpLabs Parsing Language)",
   "main": "bindings/node",
   "types": "bindings/node",
   "keywords": [

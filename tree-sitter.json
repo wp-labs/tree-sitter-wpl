@@ -1,0 +1,22 @@
+{
+  "grammars": [
+    {
+      "name": "wpl",
+      "camelcase": "Wpl",
+      "scope": "source.wpl",
+      "path": ".",
+      "file-types": ["wpl"],
+      "highlights": "queries/highlights.scm"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for WPL (WarpLabs Parsing Language)",
+    "authors": [{"name": "WarpLabs"}],
+    "repository": {
+      "type": "git",
+      "url": "https://github.com/wp-labs/tree-sitter-wpl"
+    }
+  }
+}

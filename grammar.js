@@ -9,68 +9,47 @@ module.exports = grammar({
 
   externals: ($) => [$.quote_format],
 
-  conflicts: ($) => [[$.field, $.subfield]],
+  conflicts: ($) => [[$.group_meta, $.function_name]],
 
   rules: {
     source_file: ($) => repeat($._declaration),
 
     _declaration: ($) => choice($.package_decl, $.rule_decl),
 
-    // ── Package declaration ──────────────────────────────────────
     package_decl: ($) =>
       seq(
         optional($.annotation),
         "package",
         field("name", $.path_name),
         "{",
-        repeat($.rule_decl),
+        repeat1($.rule_decl),
         "}",
       ),
 
-    // ── Rule declaration ─────────────────────────────────────────
     rule_decl: ($) =>
       seq(
         optional($.annotation),
         "rule",
         field("name", $.path_name),
         "{",
-        $._statement,
-        "}",
-      ),
-
-    path_name: ($) => /[A-Za-z0-9_.\/-]+/,
-
-    // ── Statement ────────────────────────────────────────────────
-    _statement: ($) => choice($.plg_pipe_block, $.expression),
-
-    plg_pipe_block: ($) =>
-      seq(
-        optional("@"),
-        "plg_pipe",
-        "(",
-        "id",
-        ":",
-        field("key", $.key),
-        ")",
-        "{",
         $.expression,
         "}",
       ),
 
-    // ── Expression: [preproc] group {, group} ────────────────────
-    expression: ($) =>
-      seq(optional($.preproc), $.group, repeat(seq(",", $.group))),
+    path_name: ($) => $.key,
 
-    // ── Preprocessor pipeline: |step|step| ───────────────────────
+    expression: ($) => seq(optional($.preproc), $.group, repeat(seq(",", $.group))),
+
     preproc: ($) => seq("|", repeat1(seq($.preproc_step, "|"))),
 
-    preproc_step: ($) =>
-      choice(seq("plg_pipe", "/", $.key), $.preproc_path),
+    preproc_step: ($) => choice($.plg_pipe_step, $.key, $.identifier),
 
-    preproc_path: ($) =>
-      seq(field("ns", $.identifier), "/", field("name", $.identifier)),
+    plg_pipe_step: ($) =>
+      choice(
+        seq("plg_pipe", "/", field("name", $.key)),
+        seq("plg_pipe", "(", field("name", $.key), ")"),
+      ),
 
-    // ── Group: [meta] ( field_list ) [len] [sep] ─────────────────
     group: ($) =>
       seq(
         optional(field("meta", $.group_meta)),
@@ -78,97 +57,114 @@ module.exports = grammar({
         optional($._field_list),
         ")",
         optional($.group_length),
-        optional($.separator),
+        optional(field("separator", $.shortcut_sep)),
       ),
 
     group_meta: ($) => choice("alt", "opt", "some_of", "seq", "not"),
 
     group_length: ($) => seq("[", $.number, "]"),
 
-    _field_list: ($) =>
-      seq($._field_item, repeat(seq(",", $._field_item)), optional(",")),
+    _field_list: ($) => seq($.field, repeat(seq(",", $.field)), optional(",")),
 
-    _field_item: ($) => choice($.subfield, $.field),
-
-    // ── Field ────────────────────────────────────────────────────
-    // Order per EBNF & parser (wpl_field.rs):
-    //   [repeat] type [(args)] [:name] [[len]] [fmt] [sep] {pipe}
     field: ($) =>
       seq(
         optional($.repeat_prefix),
-        $.data_type,
-        optional($.type_arguments),
+        field("meta", $.meta_token),
+        optional($.symbol_content),
+        optional($.subfields),
         optional(seq(":", field("binding", $.var_name))),
         optional($.field_length),
         optional($.format),
-        optional($.separator),
+        optional(field("separator", $.field_separator)),
         repeat($.pipe),
       ),
-
-    // ── Subfield (with @ref) ─────────────────────────────────────
-    subfield: ($) =>
-      seq(
-        optional(choice($.opt_type, $.data_type)),
-        optional($.type_arguments),
-        "@",
-        field("ref", $.ref_path),
-        optional(seq(":", field("binding", $.var_name))),
-        optional($.format),
-        optional($.separator),
-        repeat($.pipe),
-      ),
-
-    opt_type: ($) => seq("opt", "(", $.data_type, ")"),
 
     repeat_prefix: ($) => seq(optional($.number), "*"),
 
-    // ── Data type ────────────────────────────────────────────────
-    data_type: ($) => choice($.array_type, $.ns_type, $.type_name),
+    subfields: ($) =>
+      seq("(", optional($._subfield_list), ")"),
 
-    type_name: ($) => $.identifier,
+    _subfield_list: ($) =>
+      seq($.subfield, repeat(seq(",", $.subfield)), optional(",")),
 
-    ns_type: ($) =>
-      prec(
-        1,
+    subfield: ($) =>
+      choice(
         seq(
-          field("namespace", $.identifier),
-          "/",
-          field("name", $.identifier),
+          field("meta", $.subfield_meta),
+          optional($.symbol_content),
+          optional(seq("@", field("ref", $.ref_path_or_quoted))),
+          optional(seq(":", field("binding", $.var_name))),
+          optional($.format),
+          optional(field("separator", $.field_separator)),
+          repeat($.pipe),
         ),
+        seq(
+          "@",
+          field("ref", $.ref_path_or_quoted),
+          optional(seq(":", field("binding", $.var_name))),
+          optional($.format),
+          optional(field("separator", $.field_separator)),
+          repeat($.pipe),
+        ),
+        seq(
+          ":",
+          field("binding", $.var_name),
+          optional($.format),
+          optional(field("separator", $.field_separator)),
+          repeat($.pipe),
+        ),
+        seq(
+          $.format,
+          optional(field("separator", $.field_separator)),
+          repeat($.pipe),
+        ),
+        seq($.field_separator, repeat($.pipe)),
       ),
+
+    subfield_meta: ($) => choice($.opt_type, $.meta_token),
+
+    opt_type: ($) => seq("opt", "(", $.key, ")"),
+
+    meta_token: ($) => choice($.array_type, $.meta_name),
+
+    meta_name: ($) => /[A-Za-z0-9_\/]+/,
 
     array_type: ($) =>
       seq("array", optional(seq("/", field("element", $.identifier)))),
 
-    // ── Type arguments (subfields or symbol content) ─────────────
-    type_arguments: ($) => seq("(", optional($._field_list), ")"),
+    symbol_content: ($) =>
+      seq("(", field("content", $.symbol_text), ")"),
+
+    symbol_text: ($) => token(repeat1(choice(/[^),@\\]/, /\\./))),
 
     field_length: ($) => seq("[", $.number, "]"),
 
-    // ── Format ───────────────────────────────────────────────────
     format: ($) => choice($.scope_format, $.quote_format),
-    scope_format: ($) => seq("<", /[^>]*/, ">"),
-    // quote_format handled by external scanner
 
-    // ── Separator ────────────────────────────────────────────────
-    separator: ($) => choice($.shortcut_sep, $.pattern_sep),
+    scope_format: ($) => seq("<", token(/[^>]*/), ">"),
+
+    field_separator: ($) => choice($.shortcut_sep, $.pattern_sep),
+
     shortcut_sep: ($) => prec(1, repeat1($.escape_char)),
-    escape_char: ($) => /\\./,
-    pattern_sep: ($) => seq("{", /[^}]*/, "}"),
 
-    // ── Pipe ─────────────────────────────────────────────────────
-    pipe: ($) => seq("|", choice($.fun_call, $.group)),
+    escape_char: ($) => /\\./,
+
+    pattern_sep: ($) => seq("{", token(/[^}]*/), "}"),
+
+    pipe: ($) => seq("|", choice(prec(2, $.fun_call), $.group)),
 
     fun_call: ($) =>
       prec(
         1,
         seq(
-          field("function", choice($.identifier, "not")),
+          field("function", $.function_name),
           "(",
           optional($.fun_args),
           ")",
         ),
       ),
+
+    function_name: ($) => choice("not", $.identifier),
 
     fun_args: ($) => seq($._fun_arg, repeat(seq(",", $._fun_arg))),
 
@@ -176,15 +172,16 @@ module.exports = grammar({
       choice(
         $.fun_call,
         $.quoted_string,
+        $.raw_string,
         $.array_literal,
         $.number,
+        $.identifier,
         $.key,
       ),
 
     array_literal: ($) =>
       seq("[", $._fun_arg, repeat(seq(",", $._fun_arg)), "]"),
 
-    // ── Annotation ───────────────────────────────────────────────
     annotation: ($) =>
       seq(
         $.annotation_start,
@@ -201,37 +198,41 @@ module.exports = grammar({
       seq("tag", "(", $.tag_kv, repeat(seq(",", $.tag_kv)), ")"),
 
     tag_kv: ($) =>
-      seq(
-        field("key", $.identifier),
-        ":",
-        field("value", $._string_literal),
+      seq(field("key", $.key), ":", field("value", $._string_literal)),
+
+    copy_raw_anno: ($) => seq("copy_raw", "(", $.tag_kv, ")"),
+
+    _string_literal: ($) =>
+      choice($.quoted_string, $.raw_string),
+
+    quoted_string: ($) => choice($.double_quoted_string, $.single_quoted_string),
+
+    double_quoted_string: ($) =>
+      token(seq('"', repeat(choice(/[^"\\]/, /\\./)), '"')),
+
+    single_quoted_string: ($) =>
+      token(seq("'", repeat(choice(/[^'\\]/, /\\./)), "'")),
+
+    raw_string: ($) =>
+      token(
+        choice(
+          seq('r#"', repeat(/[^"]/), '"#'),
+          seq('r"', repeat(/[^"]/), '"'),
+        ),
       ),
 
-    copy_raw_anno: ($) =>
-      seq(
-        "copy_raw",
-        "(",
-        "name",
-        ":",
-        field("value", $._string_literal),
-        ")",
-      ),
-
-    _string_literal: ($) => choice($.quoted_string, $.raw_string),
-
-    // ── Literals ─────────────────────────────────────────────────
-    quoted_string: ($) => token(seq('"', repeat(choice(/[^"\\]/, /\\./)), '"')),
-
-    raw_string: ($) => token(seq("r#", '"', /[^"]*/, '"', "#")),
+    single_quoted_raw: ($) =>
+      token(seq("'", repeat(choice(/[^'\\]/, /\\./)), "'")),
 
     number: ($) => /[0-9]+/,
 
-    // ── Identifiers ──────────────────────────────────────────────
-    identifier: ($) => /[a-zA-Z_][a-zA-Z0-9_]*/,
+    identifier: ($) => /[A-Za-z_][A-Za-z0-9_.]*/,
 
     key: ($) => /[A-Za-z0-9_.\/-]+/,
 
-    var_name: ($) => /[A-Za-z_][A-Za-z0-9_.\-]*/,
+    var_name: ($) => /[A-Za-z0-9_.-]+/,
+
+    ref_path_or_quoted: ($) => choice($.ref_path, $.single_quoted_raw),
 
     ref_path: ($) => /[A-Za-z0-9_.\/*\[\]\-]+/,
   },

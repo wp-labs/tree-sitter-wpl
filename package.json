@@ -44,6 +44,7 @@
   ],
   "scripts": {
     "install": "node-gyp-build",
-    "prebuildify": "prebuildify --napi --strip"
+    "prebuildify": "prebuildify --napi --strip",
+    "validate": "bash scripts/validate.sh"
   }
 }

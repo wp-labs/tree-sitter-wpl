@@ -34,5 +34,6 @@ dist/
 
 # Grammar volatiles
 *.wasm
+!editor/wasm/*.wasm
 *.obj
 *.o

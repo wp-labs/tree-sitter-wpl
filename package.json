@@ -14,7 +14,10 @@
     "binding.gyp",
     "prebuilds/**",
     "bindings/node/*",
+    "completions/**",
+    "editor/**",
     "queries/*",
+    "scripts/*",
     "src/**"
   ],
   "dependencies": {
@@ -45,6 +48,7 @@
   "scripts": {
     "install": "node-gyp-build",
     "prebuildify": "prebuildify --napi --strip",
+    "build:wasm": "node scripts/build-wasm.mjs",
     "validate": "bash scripts/validate.sh"
   }
 }

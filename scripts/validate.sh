@@ -55,6 +55,29 @@ package demo {
 }
 EOF
 
+run_parse_check annotations <<'EOF'
+package /pipe_demo {
+  #[copy_raw(name: "_origin"), copy_event_parse(rule: "/fun/raw_event")]
+  rule fmt_from_base64 {
+    |decode/base64|strip/bom|unquote/unescape|
+    (json(_@_origin))
+  }
+
+  #[no_match]
+  rule raw_event {
+    (chars\0)
+  }
+}
+EOF
+
+run_parse_check types <<'EOF'
+package demo {
+  rule t {
+    (domain:host, email:user, id_card, mobile_phone, kv, time_clf)
+  }
+}
+EOF
+
 run_parse_check preproc <<'EOF'
 rule demo {
   |plg_pipe(dayu)|decode/base64|strip/bom|

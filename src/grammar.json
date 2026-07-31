@@ -512,25 +512,28 @@
       ]
     },
     "repeat_prefix": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "CHOICE",
-          "members": [
-            {
-              "type": "SYMBOL",
-              "name": "number"
-            },
-            {
-              "type": "BLANK"
-            }
-          ]
-        },
-        {
-          "type": "STRING",
-          "value": "*"
-        }
-      ]
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "PATTERN",
+                "value": "[0-9]+"
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "STRING",
+            "value": "*"
+          }
+        ]
+      }
     },
     "subfields": {
       "type": "SEQ",
@@ -929,7 +932,156 @@
         },
         {
           "type": "SYMBOL",
+          "name": "builtin_meta_name"
+        },
+        {
+          "type": "SYMBOL",
           "name": "meta_name"
+        }
+      ]
+    },
+    "builtin_meta_name": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "auto"
+        },
+        {
+          "type": "STRING",
+          "value": "bad_json"
+        },
+        {
+          "type": "STRING",
+          "value": "base64"
+        },
+        {
+          "type": "STRING",
+          "value": "bool"
+        },
+        {
+          "type": "STRING",
+          "value": "chars"
+        },
+        {
+          "type": "STRING",
+          "value": "digit"
+        },
+        {
+          "type": "STRING",
+          "value": "domain"
+        },
+        {
+          "type": "STRING",
+          "value": "email"
+        },
+        {
+          "type": "STRING",
+          "value": "exact_json"
+        },
+        {
+          "type": "STRING",
+          "value": "float"
+        },
+        {
+          "type": "STRING",
+          "value": "hex"
+        },
+        {
+          "type": "STRING",
+          "value": "http/agent"
+        },
+        {
+          "type": "STRING",
+          "value": "http/method"
+        },
+        {
+          "type": "STRING",
+          "value": "http/request"
+        },
+        {
+          "type": "STRING",
+          "value": "http/status"
+        },
+        {
+          "type": "STRING",
+          "value": "id_card"
+        },
+        {
+          "type": "STRING",
+          "value": "ip"
+        },
+        {
+          "type": "STRING",
+          "value": "ip_net"
+        },
+        {
+          "type": "STRING",
+          "value": "json"
+        },
+        {
+          "type": "STRING",
+          "value": "kv"
+        },
+        {
+          "type": "STRING",
+          "value": "kvarr"
+        },
+        {
+          "type": "STRING",
+          "value": "kvarr_raw"
+        },
+        {
+          "type": "STRING",
+          "value": "mobile_phone"
+        },
+        {
+          "type": "STRING",
+          "value": "port"
+        },
+        {
+          "type": "STRING",
+          "value": "proto_text"
+        },
+        {
+          "type": "STRING",
+          "value": "sn"
+        },
+        {
+          "type": "STRING",
+          "value": "symbol"
+        },
+        {
+          "type": "STRING",
+          "value": "time"
+        },
+        {
+          "type": "STRING",
+          "value": "time_2822"
+        },
+        {
+          "type": "STRING",
+          "value": "time_3339"
+        },
+        {
+          "type": "STRING",
+          "value": "time_clf"
+        },
+        {
+          "type": "STRING",
+          "value": "time_iso"
+        },
+        {
+          "type": "STRING",
+          "value": "time_timestamp"
+        },
+        {
+          "type": "STRING",
+          "value": "url"
+        },
+        {
+          "type": "STRING",
+          "value": "_"
         }
       ]
     },
@@ -1323,6 +1475,14 @@
         {
           "type": "SYMBOL",
           "name": "copy_raw_anno"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "copy_event_parse_anno"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "no_match_anno"
         }
       ]
     },
@@ -1406,6 +1566,36 @@
         {
           "type": "STRING",
           "value": ")"
+        }
+      ]
+    },
+    "copy_event_parse_anno": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "copy_event_parse"
+        },
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "SYMBOL",
+          "name": "tag_kv"
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "no_match_anno": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "no_match"
         }
       ]
     },

@@ -86,6 +86,15 @@ rule example {
 | `ip` | IP address |
 | `hex` | Hexadecimal value |
 | `time` | Timestamp |
+| `kvarr` | Key/value array with automatic value type inference |
+| `kvarr_raw` | Key/value array that keeps undeclared values as `chars` |
+
+`kvarr_raw` uses the same subfield syntax as `kvarr`; explicit subfields still parse selected keys:
+
+```wpl
+kvarr_raw\,             // b=123 -> b as chars
+kvarr_raw(digit@b)\,    // b=123 -> b as digit
+```
 
 **Array types:**
 

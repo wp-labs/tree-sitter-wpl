@@ -79,7 +79,7 @@ module.exports = grammar({
         repeat($.pipe),
       ),
 
-    repeat_prefix: ($) => seq(optional($.number), "*"),
+    repeat_prefix: ($) => token(seq(optional(/[0-9]+/), "*")),
 
     subfields: ($) =>
       seq("(", optional($._subfield_list), ")"),
@@ -125,7 +125,46 @@ module.exports = grammar({
 
     opt_type: ($) => seq("opt", "(", $.key, ")"),
 
-    meta_token: ($) => choice($.array_type, $.meta_name),
+    meta_token: ($) => choice($.array_type, $.builtin_meta_name, $.meta_name),
+
+    builtin_meta_name: ($) =>
+      choice(
+        "auto",
+        "bad_json",
+        "base64",
+        "bool",
+        "chars",
+        "digit",
+        "domain",
+        "email",
+        "exact_json",
+        "float",
+        "hex",
+        "http/agent",
+        "http/method",
+        "http/request",
+        "http/status",
+        "id_card",
+        "ip",
+        "ip_net",
+        "json",
+        "kv",
+        "kvarr",
+        "kvarr_raw",
+        "mobile_phone",
+        "port",
+        "proto_text",
+        "sn",
+        "symbol",
+        "time",
+        "time_2822",
+        "time_3339",
+        "time_clf",
+        "time_iso",
+        "time_timestamp",
+        "url",
+        "_",
+      ),
 
     meta_name: ($) => /[A-Za-z0-9_\/]+/,
 
@@ -192,7 +231,7 @@ module.exports = grammar({
 
     annotation_start: ($) => "#[",
 
-    ann_item: ($) => choice($.tag_anno, $.copy_raw_anno),
+    ann_item: ($) => choice($.tag_anno, $.copy_raw_anno, $.copy_event_parse_anno, $.no_match_anno),
 
     tag_anno: ($) =>
       seq("tag", "(", $.tag_kv, repeat(seq(",", $.tag_kv)), ")"),
@@ -201,6 +240,11 @@ module.exports = grammar({
       seq(field("key", $.key), ":", field("value", $._string_literal)),
 
     copy_raw_anno: ($) => seq("copy_raw", "(", $.tag_kv, ")"),
+
+    copy_event_parse_anno: ($) =>
+      seq("copy_event_parse", "(", $.tag_kv, ")"),
+
+    no_match_anno: ($) => seq("no_match"),
 
     _string_literal: ($) =>
       choice($.quoted_string, $.raw_string),

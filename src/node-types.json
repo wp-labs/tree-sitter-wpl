@@ -8,7 +8,15 @@
       "required": true,
       "types": [
         {
+          "type": "copy_event_parse_anno",
+          "named": true
+        },
+        {
           "type": "copy_raw_anno",
+          "named": true
+        },
+        {
+          "type": "no_match_anno",
           "named": true
         },
         {
@@ -90,6 +98,26 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "builtin_meta_name",
+    "named": true,
+    "fields": {}
+  },
+  {
+    "type": "copy_event_parse_anno",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "tag_kv",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -398,11 +426,20 @@
           "named": true
         },
         {
+          "type": "builtin_meta_name",
+          "named": true
+        },
+        {
           "type": "meta_name",
           "named": true
         }
       ]
     }
+  },
+  {
+    "type": "no_match_anno",
+    "named": true,
+    "fields": {}
   },
   {
     "type": "opt_type",
@@ -575,21 +612,6 @@
         },
         {
           "type": "single_quoted_raw",
-          "named": true
-        }
-      ]
-    }
-  },
-  {
-    "type": "repeat_prefix",
-    "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": false,
-      "types": [
-        {
-          "type": "number",
           "named": true
         }
       ]
@@ -847,10 +869,6 @@
     "named": false
   },
   {
-    "type": "*",
-    "named": false
-  },
-  {
     "type": ",",
     "named": false
   },
@@ -883,6 +901,10 @@
     "named": false
   },
   {
+    "type": "_",
+    "named": false
+  },
+  {
     "type": "alt",
     "named": false
   },
@@ -895,7 +917,39 @@
     "named": false
   },
   {
+    "type": "auto",
+    "named": false
+  },
+  {
+    "type": "bad_json",
+    "named": false
+  },
+  {
+    "type": "base64",
+    "named": false
+  },
+  {
+    "type": "bool",
+    "named": false
+  },
+  {
+    "type": "chars",
+    "named": false
+  },
+  {
+    "type": "copy_event_parse",
+    "named": false
+  },
+  {
     "type": "copy_raw",
+    "named": false
+  },
+  {
+    "type": "digit",
+    "named": false
+  },
+  {
+    "type": "domain",
     "named": false
   },
   {
@@ -903,20 +957,88 @@
     "named": true
   },
   {
+    "type": "email",
+    "named": false
+  },
+  {
     "type": "escape_char",
     "named": true
+  },
+  {
+    "type": "exact_json",
+    "named": false
+  },
+  {
+    "type": "float",
+    "named": false
+  },
+  {
+    "type": "hex",
+    "named": false
+  },
+  {
+    "type": "http/agent",
+    "named": false
+  },
+  {
+    "type": "http/method",
+    "named": false
+  },
+  {
+    "type": "http/request",
+    "named": false
+  },
+  {
+    "type": "http/status",
+    "named": false
+  },
+  {
+    "type": "id_card",
+    "named": false
   },
   {
     "type": "identifier",
     "named": true
   },
   {
+    "type": "ip",
+    "named": false
+  },
+  {
+    "type": "ip_net",
+    "named": false
+  },
+  {
+    "type": "json",
+    "named": false
+  },
+  {
     "type": "key",
     "named": true
   },
   {
+    "type": "kv",
+    "named": false
+  },
+  {
+    "type": "kvarr",
+    "named": false
+  },
+  {
+    "type": "kvarr_raw",
+    "named": false
+  },
+  {
     "type": "meta_name",
     "named": true
+  },
+  {
+    "type": "mobile_phone",
+    "named": false
+  },
+  {
+    "type": "no_match",
+    "named": false
   },
   {
     "type": "not",
@@ -939,6 +1061,14 @@
     "named": false
   },
   {
+    "type": "port",
+    "named": false
+  },
+  {
+    "type": "proto_text",
+    "named": false
+  },
+  {
     "type": "quote_format",
     "named": true
   },
@@ -951,6 +1081,10 @@
     "named": true
   },
   {
+    "type": "repeat_prefix",
+    "named": true
+  },
+  {
     "type": "rule",
     "named": false
   },
@@ -959,7 +1093,15 @@
     "named": false
   },
   {
+    "type": "sn",
+    "named": false
+  },
+  {
     "type": "some_of",
+    "named": false
+  },
+  {
+    "type": "symbol",
     "named": false
   },
   {
@@ -968,6 +1110,34 @@
   },
   {
     "type": "tag",
+    "named": false
+  },
+  {
+    "type": "time",
+    "named": false
+  },
+  {
+    "type": "time_2822",
+    "named": false
+  },
+  {
+    "type": "time_3339",
+    "named": false
+  },
+  {
+    "type": "time_clf",
+    "named": false
+  },
+  {
+    "type": "time_iso",
+    "named": false
+  },
+  {
+    "type": "time_timestamp",
+    "named": false
+  },
+  {
+    "type": "url",
     "named": false
   },
   {

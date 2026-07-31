@@ -12,11 +12,13 @@
   "not"
   "tag"
   "copy_raw"
+  "copy_event_parse"
+  "no_match"
   "array"
 ] @keyword
 
 ; ── Operators / punctuation ──
-"*" @operator
+(repeat_prefix) @operator
 "|" @operator
 "@" @operator
 

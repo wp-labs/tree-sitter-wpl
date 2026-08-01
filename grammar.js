@@ -3,7 +3,7 @@
 module.exports = grammar({
   name: "wpl",
 
-  extras: ($) => [/\s/],
+  extras: ($) => [/\s/, $.comment],
 
   word: ($) => $.identifier,
 
@@ -13,6 +13,11 @@ module.exports = grammar({
 
   rules: {
     source_file: ($) => repeat($._declaration),
+
+    // ── Comments ───────────────────────────────────────────────
+    // Only // line comments: WPL annotations use #[...], so '#' cannot
+    // be a comment marker here (unlike tree-sitter-oml).
+    comment: (_$) => token(seq("//", /.*/)),
 
     _declaration: ($) => choice($.package_decl, $.rule_decl),
 

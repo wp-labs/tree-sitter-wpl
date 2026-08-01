@@ -78,6 +78,17 @@ package demo {
 }
 EOF
 
+run_parse_check comments <<'EOF'
+// top-level comment
+package demo {
+  // before rule
+  rule hello {
+    // inside rule body
+    (chars:name, digit:age)   // trailing comment
+  }
+}
+EOF
+
 run_parse_check preproc <<'EOF'
 rule demo {
   |plg_pipe(dayu)|decode/base64|strip/bom|

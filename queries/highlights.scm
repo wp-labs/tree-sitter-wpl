@@ -31,6 +31,9 @@
 (raw_string) @string
 (single_quoted_raw) @string
 
+; ── Comments ──
+(comment) @comment
+
 ; ── Number literals ──
 (number) @number
 

@@ -937,6 +937,11 @@
     "named": false
   },
   {
+    "type": "comment",
+    "named": true,
+    "extra": true
+  },
+  {
     "type": "copy_event_parse",
     "named": false
   },

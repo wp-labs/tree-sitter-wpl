@@ -26,6 +26,7 @@ impl Default for WplFormatter {
 }
 
 impl WplFormatter {
+    const SIMPLE_FUNCS: &[&str] = &["chars_replace"];
     const RAW_FUNCS: &[&str] = &[
         "symbol",
         "f_chars_not_has",
@@ -69,11 +70,12 @@ impl WplFormatter {
             .collect();
         let input_len = normalized.len();
 
-        let mut bracket_stack: Vec<(char, char)> = Vec::new();
+        let mut bracket_stack: Vec<(char, char, usize)> = Vec::new();
         let mut i = 0usize;
         let mut indent = 0usize;
         let mut start_of_line = true;
         let mut line_no = 1usize;
+        let mut continuation_open_pending = false;
 
         let bytes = normalized.as_bytes();
         while i < chars.len() {
@@ -100,7 +102,12 @@ impl WplFormatter {
                 let next_non_ws = self.next_non_whitespace_pos(&chars, i + 1);
                 let comma_follows = next_non_ws.is_some_and(|idx| chars[idx] == ',');
                 let has_closing_quote = self.has_closing_quote(&chars, i + 1);
-                if comma_follows || !has_closing_quote {
+                let starts_string = self
+                    .previous_non_whitespace_pos(&chars, i)
+                    .is_none_or(|idx| {
+                        matches!(chars[idx], '(' | ',' | ':' | '=' | '[' | '{' | '|')
+                    });
+                if !starts_string && (comma_follows || !has_closing_quote) {
                     self.write_indent_if_needed(start_of_line, indent, &mut out);
                     out.push('"');
                     let new_i = next_non_ws.unwrap_or(i + 1);
@@ -130,15 +137,21 @@ impl WplFormatter {
                 continue;
             }
 
+            if let Some(name_len) = self.starts_with_raw_func(&chars, i, Self::SIMPLE_FUNCS) {
+                if let Some((block, consumed)) = self.read_raw_func_block(&chars[i..], name_len) {
+                    self.write_indent_if_needed(start_of_line, indent, &mut out);
+                    out.push_str(&self.compact_simple_call(&block));
+                    line_no = line_no.saturating_add(block.matches('\n').count());
+                    start_of_line = false;
+                    i += consumed;
+                    continue;
+                }
+            }
+
             if c == '#' && i + 1 < chars.len() && chars[i + 1] == '[' {
                 let (ann, consumed) = self.read_bracket_block(&chars[i..], '[', ']', line_no)?;
                 self.write_indent_if_needed(start_of_line, indent, &mut out);
-                out.push_str(
-                    &ann.replace('\n', " ")
-                        .split_whitespace()
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                );
+                out.push_str(&self.format_annotation(&ann));
                 out.push('\n');
                 line_no = line_no.saturating_add(ann.matches('\n').count());
                 i += consumed;
@@ -201,7 +214,7 @@ impl WplFormatter {
                         i = byte_to_char_index(&byte_offsets, end, input_len);
                         continue;
                     }
-                    bracket_stack.push(('{', '}'));
+                    bracket_stack.push(('{', '}', 0));
                     self.write_indent_if_needed(start_of_line, indent, &mut out);
                     out.push('{');
                     out.push('\n');
@@ -210,7 +223,7 @@ impl WplFormatter {
                     i += 1;
                 }
                 '}' => {
-                    if let Some((_, expected)) = bracket_stack.pop() {
+                    if let Some((_, expected, _)) = bracket_stack.pop() {
                         if expected != '}' {
                             return Err(WplFormatError::MismatchedBracket {
                                 expected,
@@ -265,16 +278,20 @@ impl WplFormatter {
                             continue;
                         }
                     }
-                    bracket_stack.push(('(', ')'));
+                    let continuation_indent = usize::from(continuation_open_pending);
+                    continuation_open_pending = false;
+                    bracket_stack.push(('(', ')', continuation_indent));
                     self.write_indent_if_needed(start_of_line, indent, &mut out);
                     out.push('(');
                     out.push('\n');
-                    indent += 1;
+                    indent += 1 + continuation_indent;
                     start_of_line = true;
                     i += 1;
                 }
                 ')' => {
-                    if let Some((_, expected)) = bracket_stack.pop() {
+                    let continuation_indent;
+                    if let Some((_, expected, extra_indent)) = bracket_stack.pop() {
+                        continuation_indent = extra_indent;
                         if expected != ')' {
                             return Err(WplFormatError::MismatchedBracket {
                                 expected,
@@ -300,11 +317,12 @@ impl WplFormatter {
                         });
                     }
 
-                    indent = indent.saturating_sub(1);
+                    let closing_indent = indent.saturating_sub(1);
+                    indent = indent.saturating_sub(1 + continuation_indent);
                     if !start_of_line {
                         out.push('\n');
                     }
-                    self.write_indent_if_needed(true, indent, &mut out);
+                    self.write_indent_if_needed(true, closing_indent, &mut out);
                     out.push(')');
                     start_of_line = false;
                     i += 1;
@@ -316,9 +334,26 @@ impl WplFormatter {
                     i += 1;
                 }
                 '|' => {
-                    self.write_indent_if_needed(start_of_line, indent, &mut out);
-                    if !start_of_line && !matches!(out.chars().last(), Some(' ' | '\n')) {
-                        out.push(' ');
+                    let next_non_ws = self.next_non_whitespace_pos(&chars, i + 1);
+                    let next_is_group = next_non_ws.is_some_and(|next_idx| chars[next_idx] == '(');
+                    let next_is_simple_call = next_non_ws.is_some_and(|next_idx| {
+                        self.starts_with_raw_func(&chars, next_idx, Self::SIMPLE_FUNCS)
+                            .is_some()
+                    });
+                    let continue_multiline_pipeline =
+                        next_is_group && self.current_line_has_simple_pipeline(&out);
+                    let break_pipeline = next_is_simple_call || continue_multiline_pipeline;
+                    continuation_open_pending = continue_multiline_pipeline;
+                    if break_pipeline {
+                        if !start_of_line {
+                            out.push('\n');
+                        }
+                        self.write_indent_if_needed(true, indent + 1, &mut out);
+                    } else {
+                        self.write_indent_if_needed(start_of_line, indent, &mut out);
+                        if !start_of_line && !matches!(out.chars().last(), Some(' ' | '\n')) {
+                            out.push(' ');
+                        }
                     }
                     out.push('|');
                     out.push(' ');
@@ -340,7 +375,7 @@ impl WplFormatter {
             }
         }
 
-        if let Some((open, close)) = bracket_stack.pop() {
+        if let Some((open, close, _)) = bracket_stack.pop() {
             return Err(WplFormatError::UnclosedBracket {
                 open,
                 close,
@@ -373,6 +408,135 @@ impl WplFormatter {
                 buf.push_str(&" ".repeat(self.indent));
             }
         }
+    }
+
+    fn format_annotation(&self, annotation: &str) -> String {
+        let collapsed = annotation
+            .replace('\n', " ")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        let chars: Vec<char> = collapsed.chars().collect();
+        let mut out = String::with_capacity(collapsed.len());
+        let mut quote = None;
+        let mut escaped = false;
+        let mut i = 0usize;
+
+        while i < chars.len() {
+            let ch = chars[i];
+            if let Some(active_quote) = quote {
+                out.push(ch);
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == active_quote {
+                    quote = None;
+                }
+                i += 1;
+                continue;
+            }
+
+            if matches!(ch, '"' | '\'') {
+                quote = Some(ch);
+                out.push(ch);
+                i += 1;
+                continue;
+            }
+
+            let is_single_colon = ch == ':'
+                && chars.get(i.wrapping_sub(1)) != Some(&':')
+                && chars.get(i + 1) != Some(&':');
+            if is_single_colon {
+                while out.ends_with(' ') {
+                    out.pop();
+                }
+                out.push(':');
+                i += 1;
+                while chars.get(i).is_some_and(|next| next.is_whitespace()) {
+                    i += 1;
+                }
+                if i < chars.len() {
+                    out.push(' ');
+                }
+                continue;
+            }
+
+            if ch == ',' {
+                while out.ends_with(' ') {
+                    out.pop();
+                }
+                out.push(',');
+                i += 1;
+                while chars.get(i).is_some_and(|next| next.is_whitespace()) {
+                    i += 1;
+                }
+                if i < chars.len() && !matches!(chars[i], ')' | ']') {
+                    out.push(' ');
+                }
+                continue;
+            }
+
+            out.push(ch);
+            i += 1;
+        }
+
+        out
+    }
+
+    fn compact_simple_call(&self, call: &str) -> String {
+        let mut out = String::with_capacity(call.len());
+        let mut quote = None;
+        let mut escaped = false;
+        let mut pending_space = false;
+        let mut string_line_continuation = false;
+
+        for ch in call.chars() {
+            if let Some(active_quote) = quote {
+                if ch == '\n' {
+                    string_line_continuation = true;
+                    continue;
+                }
+                if string_line_continuation && ch.is_whitespace() {
+                    continue;
+                }
+                string_line_continuation = false;
+                out.push(ch);
+                if escaped {
+                    escaped = false;
+                } else if ch == '\\' {
+                    escaped = true;
+                } else if ch == active_quote {
+                    quote = None;
+                }
+                continue;
+            }
+
+            if matches!(ch, '"' | '\'') {
+                if pending_space && !matches!(out.chars().last(), Some('(' | ' ')) {
+                    out.push(' ');
+                }
+                pending_space = false;
+                quote = Some(ch);
+                out.push(ch);
+            } else if ch.is_whitespace() {
+                pending_space = true;
+            } else if ch == ',' {
+                while out.ends_with(' ') {
+                    out.pop();
+                }
+                out.push_str(", ");
+                pending_space = false;
+            } else {
+                if pending_space && !matches!(out.chars().last(), Some('(' | ' ')) && ch != ')' {
+                    out.push(' ');
+                }
+                pending_space = false;
+                out.push(ch);
+            }
+        }
+
+        out
     }
 
     fn read_string(
@@ -521,6 +685,21 @@ impl WplFormatter {
             .skip(start)
             .find(|(_, ch)| !ch.is_whitespace())
             .map(|(idx, _)| idx)
+    }
+
+    fn previous_non_whitespace_pos(&self, input: &[char], end: usize) -> Option<usize> {
+        input[..end].iter().rposition(|ch| !ch.is_whitespace())
+    }
+
+    fn current_line_has_simple_pipeline(&self, output: &str) -> bool {
+        output
+            .rsplit('\n')
+            .find(|line| !line.trim().is_empty())
+            .is_some_and(|line| {
+                Self::SIMPLE_FUNCS
+                    .iter()
+                    .any(|name| line.contains(&format!("| {name}(")))
+            })
     }
 
     fn has_closing_quote(&self, input: &[char], start: usize) -> bool {
@@ -699,6 +878,100 @@ rule nginx {
 }
 "#;
 
+    const CHARS_REPLACE_WPL_INPUT: &str = r#"package jhpt_api_access_log {
+#[tag(log_desc:"奇安信堡垒机命令操作日志", log_type: "bh_command_operation_log")]
+rule bh_command_operation_log {
+(
+_:pri<<,>>,
+time:access_time,
+2*_,
+),
+(
+chars\0 | chars_replace(
+"count(1),",
+""
+) | chars_replace(
+",,",
+","
+) | chars_replace(
+",prod_id=",
+", prod_id="
+) | chars_replace(
+",prod_version=",
+", prod_version="
+) | chars_replace(
+",prod_ips=",
+", prod_ips="
+) | chars_replace(
+",
+源IP",
+"\", 源IP"
+) | chars_replace(
+"command=',",
+"command='',"
+) | (
+kvarr(
+@action,
+@logType,
+@command,
+time@time,
+@targetIP,
+@resource,
+@sourceIP,
+@user,
+@session_id,
+@protocol,
+array/chars@prod_ips,
+@prod_name,
+@prod_id,
+@prod_version,
+) {,\s(\S=)} | f_chars_has(logType, YAB_CMD_OPS_LOG)
+)
+)
+}
+}
+"#;
+
+    const CHARS_REPLACE_WPL_EXPECTED: &str = r#"package jhpt_api_access_log {
+    #[tag(log_desc: "奇安信堡垒机命令操作日志", log_type: "bh_command_operation_log")]
+    rule bh_command_operation_log {
+        (
+            _:pri<<,>>,
+            time:access_time,
+            2*_,
+        ),
+        (
+            chars\0
+                | chars_replace("count(1),", "")
+                | chars_replace(",,", ",")
+                | chars_replace(",prod_id=", ", prod_id=")
+                | chars_replace(",prod_version=", ", prod_version=")
+                | chars_replace(",prod_ips=", ", prod_ips=")
+                | chars_replace(",源IP", "\", 源IP")
+                | chars_replace("command=',", "command='',")
+                | (
+                    kvarr(
+                        @action,
+                        @logType,
+                        @command,
+                        time@time,
+                        @targetIP,
+                        @resource,
+                        @sourceIP,
+                        @user,
+                        @session_id,
+                        @protocol,
+                        array/chars@prod_ips,
+                        @prod_name,
+                        @prod_id,
+                        @prod_version,
+                    ) {,\s(\S=)} | f_chars_has(logType, YAB_CMD_OPS_LOG)
+                )
+        )
+    }
+}
+"#;
+
     #[test]
     fn formats_nested_rule() {
         let input = r#"package demo { rule test { (chars:name,digit:age) } }"#;
@@ -751,5 +1024,48 @@ package demo {
             format(NGINX_PARSE_WPL_INPUT).unwrap(),
             NGINX_PARSE_WPL_EXPECTED
         );
+    }
+
+    #[test]
+    fn preserves_comma_prefixed_chars_replace_strings() {
+        let formatted = format(CHARS_REPLACE_WPL_INPUT).unwrap();
+        assert_eq!(formatted, CHARS_REPLACE_WPL_EXPECTED);
+        assert_eq!(format(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn keeps_direct_group_pipeline_inline() {
+        let input =
+            r#"package demo { rule demo { (chars | (time_3339:time,time:time2),digit:status) } }"#;
+        let expected = r#"package demo {
+    rule demo {
+        (
+            chars | (
+                time_3339:time,
+                time:time2
+            ),
+            digit:status
+        )
+    }
+}
+"#;
+        let formatted = format(input).unwrap();
+        assert_eq!(formatted, expected);
+        assert_eq!(format(&formatted).unwrap(), formatted);
+    }
+
+    #[test]
+    fn normalizes_annotation_colon_spacing_without_touching_strings() {
+        let input = r#"#[tag(log_desc:"https://example.test:8443",log_type:"demo")]
+package demo { rule demo { (chars:value) } }
+"#;
+        let expected = r#"#[tag(log_desc: "https://example.test:8443", log_type: "demo")]
+package demo {
+    rule demo {
+        (chars:value)
+    }
+}
+"#;
+        assert_eq!(format(input).unwrap(), expected);
     }
 }
